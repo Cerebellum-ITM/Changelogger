@@ -5,11 +5,7 @@ export interface GenerateInput {
   prompt: string;
   repoFullName: string;
   commits: Commit[];
-}
-
-export interface GenerateHandle {
-  promise: Promise<string>;
-  stream: AsyncIterable<string>;
+  model?: string;
 }
 
 function buildUserMessage(input: GenerateInput): string {
@@ -28,6 +24,8 @@ function buildUserMessage(input: GenerateInput): string {
   return lines.join("\n");
 }
 
+export const DEFAULT_AI_MODEL = "openai-gpt-4o-mini";
+
 export function generate(input: GenerateInput): {
   promise: Promise<string>;
   onData: (cb: (chunk: string) => void) => void;
@@ -35,7 +33,8 @@ export function generate(input: GenerateInput): {
   const userMessage = buildUserMessage(input);
   const fullPrompt = `${input.prompt.trim()}\n\n---\n\n${userMessage}`;
 
-  const answer = AI.ask(fullPrompt);
+  const model = (input.model ?? DEFAULT_AI_MODEL) as AI.Model;
+  const answer = AI.ask(fullPrompt, { model });
   const listeners: Array<(chunk: string) => void> = [];
   answer.on("data", (chunk: string) => {
     for (const fn of listeners) fn(chunk);
@@ -48,5 +47,3 @@ export function generate(input: GenerateInput): {
     },
   };
 }
-
-export const RAYCAST_AI_MODEL = "raycast-ai-default";

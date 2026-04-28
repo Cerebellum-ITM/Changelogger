@@ -1,12 +1,32 @@
-import { Action, ActionPanel, Detail, Icon, List, Toast, open, showToast, useNavigation } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Detail,
+  Icon,
+  List,
+  Toast,
+  getPreferenceValues,
+  open,
+  showToast,
+  useNavigation,
+} from "@raycast/api";
 import { showFailureToast, useCachedPromise } from "@raycast/utils";
 import { useEffect, useMemo, useState } from "react";
 import { Commit, Repo } from "./types";
 import { listCommits, listRepos } from "./api/github";
 import { loadPrompt, PROMPT_PATH } from "./config/prompt";
-import { generate, RAYCAST_AI_MODEL } from "./ai/generate";
+import { DEFAULT_AI_MODEL, generate } from "./ai/generate";
 import { insertRecord } from "./storage/history";
 import { VERSION } from "./version";
+
+interface Preferences {
+  aiModel?: string;
+}
+
+function getAiModel(): string {
+  const { aiModel } = getPreferenceValues<Preferences>();
+  return aiModel && aiModel.length > 0 ? aiModel : DEFAULT_AI_MODEL;
+}
 
 export default function NewChangelogCommand() {
   return <RepoListView />;
@@ -132,6 +152,7 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [runKey, setRunKey] = useState(0);
+  const model = getAiModel();
 
   useEffect(() => {
     let cancelled = false;
@@ -144,7 +165,7 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
         const loadedPrompt = await loadPrompt();
         if (cancelled) return;
         setPrompt(loadedPrompt);
-        const handle = generate({ prompt: loadedPrompt, repoFullName: repo.fullName, commits });
+        const handle = generate({ prompt: loadedPrompt, repoFullName: repo.fullName, commits, model });
         handle.onData((chunk) => {
           if (cancelled) return;
           setOutput((prev) => prev + chunk);
@@ -163,19 +184,19 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
     return () => {
       cancelled = true;
     };
-  }, [repo.fullName, commits, runKey]);
+  }, [repo.fullName, commits, runKey, model]);
 
   const markdown = error ? `# Error\n\n\`\`\`\n${error}\n\`\`\`` : output || "_Waiting for the model…_";
 
   async function save() {
     if (!prompt || !output) return;
     try {
-      insertRecord({
+      await insertRecord({
         repoFullName: repo.fullName,
         commitShas: commits.map((c) => c.sha),
         promptUsed: prompt,
         output,
-        model: RAYCAST_AI_MODEL,
+        model,
       });
       setSaved(true);
       await showToast({ style: Toast.Style.Success, title: "Saved to history" });
@@ -193,6 +214,7 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
         <Detail.Metadata>
           <Detail.Metadata.Label title="Repository" text={repo.fullName} />
           <Detail.Metadata.Label title="Commits" text={String(commits.length)} />
+          <Detail.Metadata.Label title="AI Model" text={model} />
           <Detail.Metadata.Label title="Extension Version" text={VERSION} />
           <Detail.Metadata.Label title="Saved" text={saved ? "Yes" : "No"} />
         </Detail.Metadata>

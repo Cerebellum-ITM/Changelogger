@@ -9,9 +9,9 @@ export default function HistoryCommand() {
   const [records, setRecords] = useState<ChangelogRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  function refresh() {
+  async function refresh() {
     try {
-      setRecords(listRecords());
+      setRecords(await listRecords());
     } catch (err) {
       showFailureToast(err, { title: "Failed to read history" });
     } finally {
@@ -31,8 +31,8 @@ export default function HistoryCommand() {
     });
     if (!confirmed) return;
     try {
-      deleteRecord(record.id);
-      refresh();
+      await deleteRecord(record.id);
+      await refresh();
       await showToast({ style: Toast.Style.Success, title: "Deleted" });
     } catch (err) {
       await showFailureToast(err, { title: "Delete failed" });
@@ -51,7 +51,7 @@ export default function HistoryCommand() {
       ) : (
         records.map((r) => {
           const date = new Date(r.createdAt);
-          const detailMd = `# ${r.repoFullName}\n\n_${date.toLocaleString()} · ${r.commitShas.length} commit${r.commitShas.length === 1 ? "" : "s"} · ext v${r.extVersion}_\n\n---\n\n${r.output}`;
+          const detailMd = `# ${r.repoFullName}\n\n_${date.toLocaleString()} · ${r.commitShas.length} commit${r.commitShas.length === 1 ? "" : "s"} · ${r.model ?? "unknown model"} · ext v${r.extVersion}_\n\n---\n\n${r.output}`;
           return (
             <List.Item
               key={r.id}

@@ -1,34 +1,41 @@
-import Database from "better-sqlite3";
-import fs from "fs";
+import { promises as fs } from "fs";
 import path from "path";
 import { CONFIG_DIR } from "../config/prompt";
+import { ChangelogRecord } from "../types";
 
-export const DB_PATH = path.join(CONFIG_DIR, "history.db");
+export const HISTORY_PATH = path.join(CONFIG_DIR, "history.json");
 
-let cached: Database.Database | null = null;
-
-export function getDb(): Database.Database {
-  if (cached) return cached;
-  fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  const db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  migrate(db);
-  cached = db;
-  return db;
+export interface HistoryFile {
+  version: 1;
+  nextId: number;
+  records: ChangelogRecord[];
 }
 
-function migrate(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS changelogs (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT,
-      created_at     TEXT    NOT NULL,
-      repo_full_name TEXT    NOT NULL,
-      commit_shas    TEXT    NOT NULL,
-      prompt_used    TEXT    NOT NULL,
-      output         TEXT    NOT NULL,
-      model          TEXT,
-      ext_version    TEXT    NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_changelogs_created ON changelogs(created_at DESC);
-  `);
+const EMPTY: HistoryFile = { version: 1, nextId: 1, records: [] };
+
+async function ensureDir(): Promise<void> {
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
+}
+
+export async function readStore(): Promise<HistoryFile> {
+  await ensureDir();
+  try {
+    const raw = await fs.readFile(HISTORY_PATH, "utf8");
+    const parsed = JSON.parse(raw) as Partial<HistoryFile>;
+    return {
+      version: 1,
+      nextId: typeof parsed.nextId === "number" ? parsed.nextId : 1,
+      records: Array.isArray(parsed.records) ? parsed.records : [],
+    };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { ...EMPTY };
+    throw err;
+  }
+}
+
+export async function writeStore(store: HistoryFile): Promise<void> {
+  await ensureDir();
+  const tmp = `${HISTORY_PATH}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(store, null, 2), "utf8");
+  await fs.rename(tmp, HISTORY_PATH);
 }
