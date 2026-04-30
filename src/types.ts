@@ -22,10 +22,17 @@ export interface Commit {
   htmlUrl: string;
 }
 
+export interface Branch {
+  name: string;
+  sha: string;
+  isDefault: boolean;
+}
+
 export interface ChangelogRecord {
   id: number;
   createdAt: string;
   repoFullName: string;
+  branch?: string;
   commitShas: string[];
   promptUsed: string;
   output: string;

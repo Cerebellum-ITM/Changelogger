@@ -5,7 +5,7 @@
   "description": "Generate AI changelogs from selected GitHub commits and save them to a local SQLite history.",
   "icon": "extension-icon.png",
   "author": "Pascual_Chavez",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "platforms": [
     "macOS",
     "Windows"
@@ -122,6 +122,26 @@
           "title": "xAI Grok 4",
           "value": "xai-grok-4"
         }
+      ]
+    },
+    {
+      "name": "outputLanguage",
+      "type": "dropdown",
+      "required": false,
+      "title": "Output Language",
+      "description": "Language in which the generated changelog is written.",
+      "default": "es-MX",
+      "data": [
+        { "title": "Spanish (Mexico)", "value": "es-MX" },
+        { "title": "Spanish (Spain)", "value": "es-ES" },
+        { "title": "Spanish (Latin America)", "value": "es-419" },
+        { "title": "English (US)", "value": "en-US" },
+        { "title": "English (UK)", "value": "en-GB" },
+        { "title": "Portuguese (Brazil)", "value": "pt-BR" },
+        { "title": "Portuguese (Portugal)", "value": "pt-PT" },
+        { "title": "French", "value": "fr" },
+        { "title": "German", "value": "de" },
+        { "title": "Italian", "value": "it" }
       ]
     }
   ],

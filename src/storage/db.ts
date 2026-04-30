@@ -5,13 +5,15 @@ import { ChangelogRecord } from "../types";
 
 export const HISTORY_PATH = path.join(CONFIG_DIR, "history.json");
 
+export const CURRENT_HISTORY_VERSION = 2;
+
 export interface HistoryFile {
-  version: 1;
+  version: typeof CURRENT_HISTORY_VERSION;
   nextId: number;
   records: ChangelogRecord[];
 }
 
-const EMPTY: HistoryFile = { version: 1, nextId: 1, records: [] };
+const EMPTY: HistoryFile = { version: CURRENT_HISTORY_VERSION, nextId: 1, records: [] };
 
 async function ensureDir(): Promise<void> {
   await fs.mkdir(CONFIG_DIR, { recursive: true });
@@ -21,11 +23,12 @@ export async function readStore(): Promise<HistoryFile> {
   await ensureDir();
   try {
     const raw = await fs.readFile(HISTORY_PATH, "utf8");
-    const parsed = JSON.parse(raw) as Partial<HistoryFile>;
+    const parsed = JSON.parse(raw) as Partial<HistoryFile> & { version?: number };
+    const records = Array.isArray(parsed.records) ? (parsed.records as ChangelogRecord[]) : [];
     return {
-      version: 1,
+      version: CURRENT_HISTORY_VERSION,
       nextId: typeof parsed.nextId === "number" ? parsed.nextId : 1,
-      records: Array.isArray(parsed.records) ? parsed.records : [],
+      records,
     };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return { ...EMPTY };

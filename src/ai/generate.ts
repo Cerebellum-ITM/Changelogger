@@ -6,6 +6,27 @@ export interface GenerateInput {
   repoFullName: string;
   commits: Commit[];
   model?: string;
+  outputLanguage?: string;
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  "es-MX": "Spanish as spoken in Mexico (es-MX)",
+  "es-ES": "Spanish as spoken in Spain (es-ES)",
+  "es-419": "Latin American Spanish (es-419)",
+  "en-US": "American English (en-US)",
+  "en-GB": "British English (en-GB)",
+  "pt-BR": "Brazilian Portuguese (pt-BR)",
+  "pt-PT": "European Portuguese (pt-PT)",
+  fr: "French",
+  de: "German",
+  it: "Italian",
+};
+
+export const DEFAULT_OUTPUT_LANGUAGE = "es-MX";
+
+function languageDirective(code: string): string {
+  const label = LANGUAGE_LABELS[code] ?? code;
+  return `Write the entire output in ${label}. Translate any English wording from the source commits as needed. Preserve technical identifiers (function names, file names, library names) verbatim.`;
 }
 
 function buildUserMessage(input: GenerateInput): string {
@@ -31,7 +52,8 @@ export function generate(input: GenerateInput): {
   onData: (cb: (chunk: string) => void) => void;
 } {
   const userMessage = buildUserMessage(input);
-  const fullPrompt = `${input.prompt.trim()}\n\n---\n\n${userMessage}`;
+  const language = input.outputLanguage ?? DEFAULT_OUTPUT_LANGUAGE;
+  const fullPrompt = `${input.prompt.trim()}\n\n${languageDirective(language)}\n\n---\n\n${userMessage}`;
 
   const model = (input.model ?? DEFAULT_AI_MODEL) as AI.Model;
   const answer = AI.ask(fullPrompt, { model });

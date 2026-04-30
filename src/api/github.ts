@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import { getPreferenceValues } from "@raycast/api";
-import { Commit, Repo } from "../types";
+import { Branch, Commit, Repo } from "../types";
 
 interface Preferences {
   githubToken: string;
@@ -43,12 +43,31 @@ export async function listRepos(): Promise<Repo[]> {
   }));
 }
 
-export async function listCommits(repo: Repo): Promise<Commit[]> {
+export async function listBranches(repo: Repo): Promise<Branch[]> {
+  const octokit = getOctokit();
+  const branches = await octokit.paginate(octokit.repos.listBranches, {
+    owner: repo.owner,
+    repo: repo.name,
+    per_page: 100,
+  });
+  return branches
+    .map((b) => ({
+      name: b.name,
+      sha: b.commit.sha,
+      isDefault: b.name === repo.defaultBranch,
+    }))
+    .sort((a, b) => {
+      if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+}
+
+export async function listCommits(repo: Repo, branch?: string): Promise<Commit[]> {
   const octokit = getOctokit();
   const { data } = await octokit.repos.listCommits({
     owner: repo.owner,
     repo: repo.name,
-    sha: repo.defaultBranch,
+    sha: branch ?? repo.defaultBranch,
     per_page: getCommitsPerPage(),
   });
   return data.map((c) => {

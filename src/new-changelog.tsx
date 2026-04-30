@@ -12,20 +12,26 @@ import {
 } from "@raycast/api";
 import { showFailureToast, useCachedPromise } from "@raycast/utils";
 import { useEffect, useMemo, useState } from "react";
-import { Commit, Repo } from "./types";
-import { listCommits, listRepos } from "./api/github";
+import { Branch, Commit, Repo } from "./types";
+import { listBranches, listCommits, listRepos } from "./api/github";
 import { loadPrompt, PROMPT_PATH } from "./config/prompt";
-import { DEFAULT_AI_MODEL, generate } from "./ai/generate";
+import { DEFAULT_AI_MODEL, DEFAULT_OUTPUT_LANGUAGE, generate } from "./ai/generate";
 import { insertRecord } from "./storage/history";
 import { VERSION } from "./version";
 
 interface Preferences {
   aiModel?: string;
+  outputLanguage?: string;
 }
 
 function getAiModel(): string {
   const { aiModel } = getPreferenceValues<Preferences>();
   return aiModel && aiModel.length > 0 ? aiModel : DEFAULT_AI_MODEL;
+}
+
+function getOutputLanguage(): string {
+  const { outputLanguage } = getPreferenceValues<Preferences>();
+  return outputLanguage && outputLanguage.length > 0 ? outputLanguage : DEFAULT_OUTPUT_LANGUAGE;
 }
 
 export default function NewChangelogCommand() {
@@ -75,7 +81,8 @@ function RepoListView() {
 function CommitListView({ repo }: { repo: Repo }) {
   const { push } = useNavigation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const { data, isLoading, revalidate } = useCachedPromise(listCommits, [repo], {
+  const [branch, setBranch] = useState<string>(repo.defaultBranch);
+  const { data, isLoading, revalidate } = useCachedPromise(listCommits, [repo, branch], {
     onError: (err) => showFailureToast(err, { title: "Failed to load commits" }),
   });
 
@@ -96,7 +103,7 @@ function CommitListView({ repo }: { repo: Repo }) {
     <List
       isLoading={isLoading}
       isShowingDetail
-      navigationTitle={`${repo.fullName} — ${selected.size} selected`}
+      navigationTitle={`${repo.fullName} @ ${branch} — ${selected.size} selected`}
       searchBarPlaceholder="Search commits…"
     >
       {commits.map((c) => {
@@ -126,8 +133,25 @@ function CommitListView({ repo }: { repo: Repo }) {
                       showToast({ style: Toast.Style.Failure, title: "Select at least one commit" });
                       return;
                     }
-                    push(<GenerateView repo={repo} commits={selectedCommits} />);
+                    push(<GenerateView repo={repo} branch={branch} commits={selectedCommits} />);
                   }}
+                />
+                <Action
+                  title="Switch Branch"
+                  icon={Icon.Switch}
+                  shortcut={{ modifiers: ["cmd"], key: "b" }}
+                  onAction={() =>
+                    push(
+                      <BranchListView
+                        repo={repo}
+                        currentBranch={branch}
+                        onPick={(name) => {
+                          setBranch(name);
+                          setSelected(new Set());
+                        }}
+                      />,
+                    )
+                  }
                 />
                 <Action.OpenInBrowser url={c.htmlUrl} />
                 <Action
@@ -145,7 +169,57 @@ function CommitListView({ repo }: { repo: Repo }) {
   );
 }
 
-function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
+function BranchListView({
+  repo,
+  currentBranch,
+  onPick,
+}: {
+  repo: Repo;
+  currentBranch: string;
+  onPick: (name: string) => void;
+}) {
+  const { pop } = useNavigation();
+  const { data, isLoading, revalidate } = useCachedPromise(listBranches, [repo], {
+    onError: (err) => showFailureToast(err, { title: "Failed to load branches" }),
+  });
+
+  return (
+    <List isLoading={isLoading} navigationTitle={`Branches — ${repo.fullName}`} searchBarPlaceholder="Search branches…">
+      {(data ?? []).map((b: Branch) => {
+        const isCurrent = b.name === currentBranch;
+        return (
+          <List.Item
+            key={b.name}
+            icon={isCurrent ? Icon.CheckCircle : Icon.Circle}
+            title={b.name}
+            subtitle={b.sha.slice(0, 7)}
+            accessories={[...(b.isDefault ? [{ tag: "default" }] : []), ...(isCurrent ? [{ tag: "current" }] : [])]}
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Use This Branch"
+                  icon={Icon.ArrowRight}
+                  onAction={() => {
+                    onPick(b.name);
+                    pop();
+                  }}
+                />
+                <Action
+                  title="Refresh"
+                  icon={Icon.ArrowClockwise}
+                  onAction={revalidate}
+                  shortcut={{ modifiers: ["cmd"], key: "r" }}
+                />
+              </ActionPanel>
+            }
+          />
+        );
+      })}
+    </List>
+  );
+}
+
+function GenerateView({ repo, branch, commits }: { repo: Repo; branch: string; commits: Commit[] }) {
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [prompt, setPrompt] = useState<string | null>(null);
@@ -153,6 +227,7 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
   const [saved, setSaved] = useState(false);
   const [runKey, setRunKey] = useState(0);
   const model = getAiModel();
+  const outputLanguage = getOutputLanguage();
 
   useEffect(() => {
     let cancelled = false;
@@ -165,7 +240,7 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
         const loadedPrompt = await loadPrompt();
         if (cancelled) return;
         setPrompt(loadedPrompt);
-        const handle = generate({ prompt: loadedPrompt, repoFullName: repo.fullName, commits, model });
+        const handle = generate({ prompt: loadedPrompt, repoFullName: repo.fullName, commits, model, outputLanguage });
         handle.onData((chunk) => {
           if (cancelled) return;
           setOutput((prev) => prev + chunk);
@@ -184,7 +259,7 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
     return () => {
       cancelled = true;
     };
-  }, [repo.fullName, commits, runKey, model]);
+  }, [repo.fullName, commits, runKey, model, outputLanguage]);
 
   const markdown = error ? `# Error\n\n\`\`\`\n${error}\n\`\`\`` : output || "_Waiting for the model…_";
 
@@ -193,6 +268,7 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
     try {
       await insertRecord({
         repoFullName: repo.fullName,
+        branch,
         commitShas: commits.map((c) => c.sha),
         promptUsed: prompt,
         output,
@@ -213,8 +289,10 @@ function GenerateView({ repo, commits }: { repo: Repo; commits: Commit[] }) {
       metadata={
         <Detail.Metadata>
           <Detail.Metadata.Label title="Repository" text={repo.fullName} />
+          <Detail.Metadata.Label title="Branch" text={branch} />
           <Detail.Metadata.Label title="Commits" text={String(commits.length)} />
           <Detail.Metadata.Label title="AI Model" text={model} />
+          <Detail.Metadata.Label title="Output Language" text={outputLanguage} />
           <Detail.Metadata.Label title="Extension Version" text={VERSION} />
           <Detail.Metadata.Label title="Saved" text={saved ? "Yes" : "No"} />
         </Detail.Metadata>

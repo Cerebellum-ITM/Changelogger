@@ -51,13 +51,14 @@ export default function HistoryCommand() {
       ) : (
         records.map((r) => {
           const date = new Date(r.createdAt);
-          const detailMd = `# ${r.repoFullName}\n\n_${date.toLocaleString()} · ${r.commitShas.length} commit${r.commitShas.length === 1 ? "" : "s"} · ${r.model ?? "unknown model"} · ext v${r.extVersion}_\n\n---\n\n${r.output}`;
+          const branchPart = r.branch ? ` · ${r.branch}` : "";
+          const detailMd = `# ${r.repoFullName}${branchPart ? `\n\n\`${r.branch}\`` : ""}\n\n_${date.toLocaleString()} · ${r.commitShas.length} commit${r.commitShas.length === 1 ? "" : "s"} · ${r.model ?? "unknown model"} · ext v${r.extVersion}_\n\n---\n\n${r.output}`;
           return (
             <List.Item
               key={r.id}
               icon={Icon.Document}
               title={r.repoFullName}
-              subtitle={`${r.commitShas.length} commit${r.commitShas.length === 1 ? "" : "s"}`}
+              subtitle={`${r.branch ? `${r.branch} · ` : ""}${r.commitShas.length} commit${r.commitShas.length === 1 ? "" : "s"}`}
               accessories={[{ date }]}
               detail={<List.Item.Detail markdown={detailMd} />}
               actions={

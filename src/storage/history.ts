@@ -4,6 +4,7 @@ import { VERSION } from "../version";
 
 interface InsertInput {
   repoFullName: string;
+  branch?: string;
   commitShas: string[];
   promptUsed: string;
   output: string;
@@ -16,6 +17,7 @@ export async function insertRecord(input: InsertInput): Promise<ChangelogRecord>
     id: store.nextId,
     createdAt: new Date().toISOString(),
     repoFullName: input.repoFullName,
+    branch: input.branch,
     commitShas: input.commitShas,
     promptUsed: input.promptUsed,
     output: input.output,
