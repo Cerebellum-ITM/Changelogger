@@ -1,0 +1,23 @@
+[commit_types]
+  behavior = "append"
+
+  [[commit_types.types]]
+    tag = "UI"
+    description = "Visual changes to the interface"
+    bg_block = "#3e3268"
+    fg_block = "#e9e0ff"
+    bg_msg = "#1d1830"
+    fg_msg = "#c8bce0"
+
+
+[commit_format]
+  type_format = "[%s]"
+
+[release_config]
+  version = "v0.2.5"
+  GH_TOKEN = "ghp_123456789dummytoken"
+  repository = "user/repo_path"
+  binary_assets_path = "bin/"
+  auto_build = false
+  build_tool = "make"
+  build_target = ""

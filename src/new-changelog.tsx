@@ -1,6 +1,7 @@
 import {
   Action,
   ActionPanel,
+  Color,
   Detail,
   Icon,
   List,
@@ -32,6 +33,58 @@ function getAiModel(): string {
 function getOutputLanguage(): string {
   const { outputLanguage } = getPreferenceValues<Preferences>();
   return outputLanguage && outputLanguage.length > 0 ? outputLanguage : DEFAULT_OUTPUT_LANGUAGE;
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  ADD: "#d1ead9",
+  NEW: "#d1ead9",
+  FEAT: "#d1ead9",
+  FEATURE: "#d1ead9",
+  FIX: "#f4cdcf",
+  BUG: "#f4cdcf",
+  HOTFIX: "#f4cdcf",
+  DOC: "#d6e4f4",
+  DOCS: "#d6e4f4",
+  WIP: "#ecd9b5",
+  STYLE: "#e9e0ff",
+  UI: "#e9e0ff",
+  REFACTOR: "#c4e0ec",
+  TEST: "#d4e3a8",
+  PERF: "#f1c5ee",
+  CHORE: "#b8bcc4",
+  DEL: "#e8b6b6",
+  BUILD: "#ecc7a3",
+  CI: "#c8d2ea",
+  REVERT: "#ecbe9a",
+  SEC: "#f0bdc4",
+  IMP: "#b8ead6",
+  REM: "#ecc6d2",
+  REF: "#c8c9f0",
+  MOV: "#efc5a3",
+  REL: "#ecdca3",
+};
+
+const FALLBACK_PALETTE = Array.from(new Set(Object.values(TYPE_COLORS)));
+
+function fallbackColorFor(label: string): string {
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) | 0;
+  const idx = Math.abs(hash) % FALLBACK_PALETTE.length;
+  return FALLBACK_PALETTE[idx];
+}
+
+function parseSubjectType(subject: string): { label: string; color: string } | null {
+  const bracket = subject.match(/^\[([A-Za-z]+)\]/);
+  if (bracket) {
+    const label = bracket[1].toUpperCase();
+    return { label, color: TYPE_COLORS[label] ?? fallbackColorFor(label) };
+  }
+  const conventional = subject.match(/^([a-zA-Z]+)(?:\([^)]+\))?!?:/);
+  if (conventional) {
+    const label = conventional[1].toUpperCase();
+    return { label, color: TYPE_COLORS[label] ?? fallbackColorFor(label) };
+  }
+  return null;
 }
 
 export default function NewChangelogCommand() {
@@ -108,14 +161,43 @@ function CommitListView({ repo }: { repo: Repo }) {
     >
       {commits.map((c) => {
         const isSelected = selected.has(c.sha);
-        const detailMd = `# ${c.subject}\n\n\`${c.shortSha}\` · ${c.authorName} · ${c.date}\n\n${c.body || "_No body._"}`;
+        const type = parseSubjectType(c.subject);
+        const detailMd = `# ${c.subject}\n\n${c.body || "_No body._"}`;
         return (
           <List.Item
             key={c.sha}
-            icon={isSelected ? Icon.CheckCircle : Icon.Circle}
+            icon={
+              isSelected
+                ? { source: Icon.CheckCircle, tintColor: Color.Green }
+                : { source: Icon.Circle, tintColor: Color.SecondaryText }
+            }
             title={c.subject}
             subtitle={`${c.shortSha} · ${c.authorName}`}
-            detail={<List.Item.Detail markdown={detailMd} />}
+            detail={
+              <List.Item.Detail
+                markdown={detailMd}
+                metadata={
+                  <List.Item.Detail.Metadata>
+                    <List.Item.Detail.Metadata.TagList title="Status">
+                      <List.Item.Detail.Metadata.TagList.Item
+                        text={isSelected ? "Selected" : "Not selected"}
+                        color={isSelected ? Color.Green : Color.SecondaryText}
+                      />
+                    </List.Item.Detail.Metadata.TagList>
+                    {type && (
+                      <List.Item.Detail.Metadata.TagList title="Type">
+                        <List.Item.Detail.Metadata.TagList.Item text={type.label} color={type.color} />
+                      </List.Item.Detail.Metadata.TagList>
+                    )}
+                    <List.Item.Detail.Metadata.Separator />
+                    <List.Item.Detail.Metadata.Label title="SHA" text={c.shortSha} />
+                    <List.Item.Detail.Metadata.Label title="Author" text={c.authorName} />
+                    <List.Item.Detail.Metadata.Label title="Date" text={new Date(c.date).toLocaleString()} />
+                    <List.Item.Detail.Metadata.Link title="Open on GitHub" target={c.htmlUrl} text="View commit" />
+                  </List.Item.Detail.Metadata>
+                }
+              />
+            }
             actions={
               <ActionPanel>
                 <Action
@@ -288,13 +370,30 @@ function GenerateView({ repo, branch, commits }: { repo: Repo; branch: string; c
       markdown={markdown}
       metadata={
         <Detail.Metadata>
+          <Detail.Metadata.TagList title="Status">
+            <Detail.Metadata.TagList.Item
+              text={isLoading ? "Generating" : error ? "Error" : "Ready"}
+              color={isLoading ? Color.Yellow : error ? Color.Red : Color.Green}
+            />
+            <Detail.Metadata.TagList.Item
+              text={saved ? "Saved" : "Unsaved"}
+              color={saved ? Color.Green : Color.SecondaryText}
+            />
+          </Detail.Metadata.TagList>
+          <Detail.Metadata.Separator />
           <Detail.Metadata.Label title="Repository" text={repo.fullName} />
-          <Detail.Metadata.Label title="Branch" text={branch} />
+          <Detail.Metadata.TagList title="Branch">
+            <Detail.Metadata.TagList.Item text={branch} color={Color.Blue} />
+          </Detail.Metadata.TagList>
           <Detail.Metadata.Label title="Commits" text={String(commits.length)} />
-          <Detail.Metadata.Label title="AI Model" text={model} />
-          <Detail.Metadata.Label title="Output Language" text={outputLanguage} />
+          <Detail.Metadata.Separator />
+          <Detail.Metadata.TagList title="AI Model">
+            <Detail.Metadata.TagList.Item text={model} color={Color.Purple} />
+          </Detail.Metadata.TagList>
+          <Detail.Metadata.TagList title="Output Language">
+            <Detail.Metadata.TagList.Item text={outputLanguage} color={Color.Orange} />
+          </Detail.Metadata.TagList>
           <Detail.Metadata.Label title="Extension Version" text={VERSION} />
-          <Detail.Metadata.Label title="Saved" text={saved ? "Yes" : "No"} />
         </Detail.Metadata>
       }
       actions={
