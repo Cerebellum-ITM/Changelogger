@@ -122,7 +122,7 @@ function CommitListView({ repo }: { repo: Repo }) {
                   title={isSelected ? "Deselect Commit" : "Select Commit"}
                   icon={isSelected ? Icon.Circle : Icon.CheckCircle}
                   onAction={() => toggle(c.sha)}
-                  shortcut={{ modifiers: ["cmd"], key: "t" }}
+                  shortcut={{ modifiers: ["ctrl"], key: "a" }}
                 />
                 <Action
                   title={`Generate Changelog from ${selected.size} Commit${selected.size === 1 ? "" : "s"}`}

@@ -53,7 +53,7 @@ The `~/.config/changelog/` path is set in `src/config/prompt.ts` (`CONFIG_DIR`).
 
 - Repo list is sorted by `pushed_at` desc.
 - Commit list uses `<List isShowingDetail>` with the body in the right pane.
-- Multi-select is implemented client-side via a `Set<string>` of SHAs (Raycast has no built-in multi-select). Toggle with `Cmd+T`. Generate with `Cmd+Enter`.
+- Multi-select is implemented client-side via a `Set<string>` of SHAs (Raycast has no built-in multi-select). Toggle with `Ctrl+A`. Generate with `Cmd+Enter`.
 - The Generate view streams output via the `data` event from `AI.ask`. Save is a separate explicit action — generation alone does not persist.
 
 ## Adding a feature: workflow
